@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candidate Evaluation Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #1a1a2e; --ink-light: #4a4a6a; --paper: #faf9f7; --cream: #f2efe9;
+    --rule: #e2ddd6; --accent: #c8440a; --accent-soft: #f5ede8;
+    --success: #2d6a4f; --success-soft: #e8f4ee; --warn: #7c5c00; --warn-soft: #fdf3d0;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: var(--ink); color: white; padding: 18px 40px; display: flex; align-items: baseline; gap: 14px; }
+  .header h1 { font-family: 'DM Serif Display', serif; font-size: 21px; font-weight: 400; }
+  .header span { font-size: 11px; opacity: 0.45; letter-spacing: 0.1em; text-transform: uppercase; }
+
+  .container { max-width: 840px; margin: 0 auto; padding: 36px 24px; }
+
+  /* STEPS */
+  .steps { display: flex; align-items: center; margin-bottom: 32px; }
+  .step { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 500; color: var(--ink-light); opacity: 0.35; transition: opacity 0.3s; white-space: nowrap; }
+  .step.active { opacity: 1; color: var(--ink); }
+  .step.done { opacity: 0.65; color: var(--success); }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--cream); border: 2px solid var(--rule); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; transition: all 0.3s; }
+  .step.active .step-num { background: var(--ink); border-color: var(--ink); color: white; }
+  .step.done .step-num { background: var(--success); border-color: var(--success); color: white; }
+  .step-line { flex: 1; height: 2px; background: var(--rule); margin: 0 10px; min-width: 24px; }
+
+  /* CARDS */
+  .card { background: white; border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .card-header { padding: 14px 22px; border-bottom: 1px solid var(--rule); background: var(--cream); display: flex; align-items: center; }
+  .card-header h2 { font-family: 'DM Serif Display', serif; font-size: 16px; font-weight: 400; }
+  .badge { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; background: var(--accent-soft); color: var(--accent); }
+  .badge-success { background: var(--success-soft) !important; color: var(--success) !important; }
+  .card-body { padding: 22px; }
+
+  /* UPLOAD */
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .upload-zone { border: 2px dashed var(--rule); border-radius: 10px; padding: 22px 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .upload-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .upload-zone.filled { border-color: var(--success); border-style: solid; background: var(--success-soft); }
+  .upload-zone input[type=file] { display: none; }
+  .upload-icon { font-size: 26px; margin-bottom: 7px; }
+  .upload-label { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .upload-hint { font-size: 11px; color: var(--ink-light); }
+  .upload-filename { font-size: 11px; color: var(--success); font-weight: 600; margin-top: 5px; word-break: break-all; }
+
+  /* FIELDS */
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .field label { font-size: 11px; font-weight: 700; color: var(--ink-light); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .field input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 9px 12px; border: 1.5px solid var(--rule); border-radius: 8px; color: var(--ink); background: white; transition: border-color 0.2s; }
+  .field input:focus { outline: none; border-color: var(--accent); }
+
+  /* QUESTIONS */
+  .q-block { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--rule); }
+  .q-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .q-label { font-size: 13px; font-weight: 600; margin-bottom: 3px; display: flex; align-items: flex-start; gap: 8px; }
+  .q-num { background: var(--accent); color: white; border-radius: 50%; width: 19px; height: 19px; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .q-hint { font-size: 12px; color: var(--ink-light); margin: 3px 0 4px 27px; font-style: italic; }
+  .q-dest { font-size: 11px; color: var(--accent); margin-bottom: 8px; margin-left: 27px; font-weight: 600; }
+  textarea.q-input { width: 100%; font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6; padding: 10px 13px; border: 1.5px solid var(--rule); border-radius: 8px; background: white; color: var(--ink); resize: vertical; min-height: 78px; transition: border-color 0.2s; }
+  textarea.q-input:focus { outline: none; border-color: var(--accent); }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 11px 24px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover:not(:disabled) { background: #a83508; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: var(--ink); color: white; }
+  .btn-secondary:hover:not(:disabled) { background: #2d2d4a; transform: translateY(-1px); }
+  .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover { background: #235a40; transform: translateY(-1px); }
+  .btn-outline { background: transparent; color: var(--ink); border: 2px solid var(--rule); }
+  .btn-outline:hover { border-color: var(--ink); }
+
+  /* LOADING */
+  .loading-wrap { text-align: center; padding: 40px 20px; }
+  .spinner-ring { display: inline-block; width: 40px; height: 40px; border: 3px solid var(--rule); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-wrap p { font-size: 14px; color: var(--ink-light); }
+  .loading-wrap small { font-size: 12px; color: var(--ink-light); opacity: 0.6; margin-top: 6px; display: block; }
+
+  /* RESULT */
+  .eval-header { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid var(--ink); }
+  .eval-candidate { font-family: 'DM Serif Display', serif; font-size: 24px; }
+  .eval-role { font-size: 14px; color: var(--ink-light); margin-top: 3px; font-weight: 500; }
+  .eval-section { margin-bottom: 26px; }
+  .eval-section:last-child { margin-bottom: 0; }
+  .eval-section-title { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--rule); padding-bottom: 7px; margin-bottom: 14px; }
+  .eval-para { font-size: 14px; line-height: 1.85; margin-bottom: 14px; }
+  .eval-para:last-child { margin-bottom: 0; }
+  .result-box { background: white; border: 1.5px solid var(--success); border-radius: 10px; padding: 30px; }
+  .result-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: flex-end; flex-wrap: wrap; }
+
+  .info-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--warn); background: var(--warn-soft); padding: 4px 11px; border-radius: 20px; margin-bottom: 20px; }
+  .error-box { background: var(--accent-soft); border: 1px solid #e8b4a0; border-radius: 10px; padding: 18px 20px; color: var(--accent); font-size: 13px; line-height: 1.6; }
+  .error-box strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+  .section { display: none; }
+  .section.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Candidate Evaluation</h1>
+  <span>Recruiter Tool</span>
+</div>
+
+<div class="container">
+
+  <div class="steps">
+    <div class="step active" id="si-1"><div class="step-num" id="sn-1">1</div><span>Upload &amp; Notes</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="si-2"><div class="step-num" id="sn-2">2</div><span>Generating</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="si-3"><div class="step-num" id="sn-3">3</div><span>Evaluation Ready</span></div>
+  </div>
+
+  <!-- STEP 1: FORM -->
+  <div class="section visible" id="sec-form">
+
+    <div class="card">
+      <div class="card-header"><h2>Documents</h2><span class="badge">Required</span></div>
+      <div class="card-body">
+        <div class="upload-grid">
+          <div class="upload-zone" id="resume-zone" onclick="document.getElementById('resume-input').click()">
+            <input type="file" id="resume-input" accept=".pdf,.docx,.doc" onchange="handleFile(this,'resume')">
+            <div class="upload-icon">📄</div>
+            <div class="upload-label">Resume</div>
+            <div class="upload-hint">PDF or Word (.docx)</div>
+            <div class="upload-filename" id="resume-name"></div>
+          </div>
+          <div class="upload-zone" id="jd-zone" onclick="document.getElementById('jd-input').click()">
+            <input type="file" id="jd-input" accept=".pdf,.docx,.doc" onchange="handleFile(this,'jd')">
+            <div class="upload-icon">📋</div>
+            <div class="upload-label">Job Description</div>
+            <div class="upload-hint">PDF or Word (.docx)</div>
+            <div class="upload-filename" id="jd-name"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Candidate Name</label><input type="text" id="candidate-name" placeholder="Full name"></div>
+          <div class="field"><label>Position Title</label><input type="text" id="position-title" placeholder="Job title"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Interview Notes</h2><span class="badge">Step 1</span></div>
+      <div class="card-body">
+        <div class="info-chip">💡 Each response is placed at a specific location in the final evaluation</div>
+
+        <div class="q-block">
+          <div class="q-label"><span class="q-num">1</span>Communication Style</div>
+          <div class="q-hint">Concise vs. long-winded · Thoughtful vs. rambling · Professional vs. casual</div>
+          <div class="q-dest">→ Section 2, Paragraph 1</div>
+          <textarea class="q-input" id="q-comm" placeholder="Describe the candidate's communication style during the interview…" rows="3"></textarea>
+        </div>
+
+        <div class="q-block">
+          <div class="q-label"><span class="q-num">2</span>Technical Skills Anecdote</div>
+          <div class="q-hint">A specific story the candidate shared demonstrating their technical abilities</div>
+          <div class="q-dest">→ Section 1, Paragraph 3</div>
+          <textarea class="q-input" id="q-tech" placeholder="Describe an anecdote the candidate shared which demonstrates their technical skills…" rows="4"></textarea>
+        </div>
+
+        <div class="q-block">
+          <div class="q-label"><span class="q-num">3</span>Relevant Experience Anecdote</div>
+          <div class="q-hint">An example showing they've handled work similar to the duties in this role</div>
+          <div class="q-dest">→ Section 1, Paragraph 4</div>
+          <textarea class="q-input" id="q-exp" placeholder="Describe an anecdote which demonstrates they have handled similar work to the duties in the JD…" rows="4"></textarea>
+        </div>
+
+        <div class="q-block">
+          <div class="q-label"><span class="q-num">4</span>Logistics</div>
+          <div class="q-hint">Salary expectations · Ability to work onsite · Sponsorship requirements</div>
+          <div class="q-dest">→ Section 3, Paragraph 2</div>
+          <textarea class="q-input" id="q-logistics" placeholder="What are the candidate's salary expectations? Are they able to work onsite? Will they require sponsorship?" rows="3"></textarea>
+        </div>
+
+        <div class="q-block">
+          <div class="q-label"><span class="q-num">5</span>Overall Concerns</div>
+          <div class="q-hint">Any reservations about this candidate's fit for the position</div>
+          <div class="q-dest">→ Section 2, Paragraph 3</div>
+          <textarea class="q-input" id="q-concerns" placeholder="What concerns do you have about the candidate's overall fit for this position?" rows="3"></textarea>
+        </div>
+
+        <div style="margin-top:22px;text-align:right;">
+          <button class="btn btn-secondary" id="submit-btn" onclick="submitEvaluation()" disabled>
+            Generate Evaluation →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: LOADING -->
+  <div class="section" id="sec-loading">
+    <div class="card">
+      <div class="card-header"><h2>Analyzing…</h2><span class="badge">Step 2</span></div>
+      <div class="card-body">
+        <div class="loading-wrap">
+          <div class="spinner-ring"></div>
+          <p>Reading resume and job description…</p>
+          <small>This usually takes 15–30 seconds</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: RESULT -->
+  <div class="section" id="sec-result">
+    <div class="card">
+      <div class="card-header"><h2>Evaluation Complete</h2><span class="badge badge-success">Ready</span></div>
+      <div class="card-body">
+        <div id="result-content"></div>
+        <div class="result-actions">
+          <button class="btn btn-outline" onclick="startOver()">← New Evaluation</button>
+          <button class="btn btn-success" id="download-btn" onclick="downloadDocx()">⬇ Download Word Doc</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="section" id="sec-error">
+    <div class="card">
+      <div class="card-header"><h2>Something went wrong</h2><span class="badge" style="background:#fde8e8;color:#c0392b;">Error</span></div>
+      <div class="card-body">
+        <div class="error-box">
+          <strong>Error</strong>
+          <span id="error-msg"></span>
+        </div>
+        <div style="margin-top:16px;text-align:right;">
+          <button class="btn btn-outline" onclick="goBack()">← Try Again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let resumeFile = null, jdFile = null;
+  let evalData = null; // stored for docx download
+
+  function handleFile(input, type) {
+    const file = input.files[0];
+    if (!file) return;
+    if (type === 'resume') {
+      resumeFile = file;
+      document.getElementById('resume-name').textContent = '✓ ' + file.name;
+      document.getElementById('resume-zone').classList.add('filled');
+    } else {
+      jdFile = file;
+      document.getElementById('jd-name').textContent = '✓ ' + file.name;
+      document.getElementById('jd-zone').classList.add('filled');
+    }
+    checkReady();
+  }
+
+  function checkReady() {
+    document.getElementById('submit-btn').disabled = !(resumeFile && jdFile);
+  }
+
+  async function submitEvaluation() {
+    const name      = document.getElementById('candidate-name').value.trim();
+    const role      = document.getElementById('position-title').value.trim();
+    const qComm     = document.getElementById('q-comm').value.trim();
+    const qTech     = document.getElementById('q-tech').value.trim();
+    const qExp      = document.getElementById('q-exp').value.trim();
+    const qLogistics= document.getElementById('q-logistics').value.trim();
+    const qConcerns = document.getElementById('q-concerns').value.trim();
+
+    setStep(2);
+    showOnly('sec-loading');
+
+    const formData = new FormData();
+    formData.append('resume', resumeFile);
+    formData.append('jobDescription', jdFile);
+    formData.append('candidateName', name);
+    formData.append('positionTitle', role);
+    formData.append('qComm', qComm);
+    formData.append('qTech', qTech);
+    formData.append('qExp', qExp);
+    formData.append('qLogistics', qLogistics);
+    formData.append('qConcerns', qConcerns);
+
+    try {
+      const resp = await fetch('/api/evaluate', { method: 'POST', body: formData });
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Unexpected server error');
+      }
+
+      evalData = data;
+      renderResult(data);
+      setStep(3);
+      showOnly('sec-result');
+
+    } catch (err) {
+      document.getElementById('error-msg').textContent = err.message;
+      showOnly('sec-error');
+    }
+  }
+
+  function renderResult(data) {
+    const sectionTitles = ['Section 1', 'Section 2', 'Section 3'];
+    let html = `<div class="result-box">
+      <div class="eval-header">
+        <div class="eval-candidate">${esc(data.candidateName)}</div>
+        <div class="eval-role">${esc(data.positionTitle)}</div>
+      </div>`;
+
+    (data.sections || []).forEach((paras, i) => {
+      html += `<div class="eval-section">
+        <div class="eval-section-title">${sectionTitles[i] || 'Section ' + (i+1)}</div>`;
+      paras.forEach(p => {
+        html += `<p class="eval-para">${esc(p)}</p>`;
+      });
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+    document.getElementById('result-content').innerHTML = html;
+  }
+
+  async function downloadDocx() {
+    if (!evalData) return;
+    const btn = document.getElementById('download-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+
+    try {
+      const resp = await fetch('/api/generate-docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(evalData)
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || 'Download failed');
+      }
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(evalData.candidateName || 'Candidate').replace(/\s+/g,'_')}_Evaluation.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+      alert('Download error: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⬇ Download Word Doc';
+    }
+  }
+
+  function startOver() {
+    resumeFile = null; jdFile = null; evalData = null;
+    ['resume-name','jd-name'].forEach(id => document.getElementById(id).textContent = '');
+    ['resume-zone','jd-zone'].forEach(id => document.getElementById(id).classList.remove('filled'));
+    ['resume-input','jd-input'].forEach(id => document.getElementById(id).value = '');
+    ['candidate-name','position-title'].forEach(id => document.getElementById(id).value = '');
+    ['q-comm','q-tech','q-exp','q-logistics','q-concerns'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('submit-btn').disabled = true;
+    setStep(1);
+    showOnly('sec-form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function goBack() {
+    setStep(1);
+    showOnly('sec-form');
+  }
+
+  function showOnly(id) {
+    ['sec-form','sec-loading','sec-result','sec-error'].forEach(s =>
+      document.getElementById(s).classList.remove('visible')
+    );
+    document.getElementById(id).classList.add('visible');
+  }
+
+  function setStep(n) {
+    for (let i = 1; i <= 3; i++) {
+      const ind = document.getElementById('si-'+i);
+      const num = document.getElementById('sn-'+i);
+      ind.classList.remove('active','done');
+      if (i < n) { ind.classList.add('done'); num.textContent = '✓'; }
+      else if (i === n) { ind.classList.add('active'); num.textContent = i; }
+      else { num.textContent = i; }
+    }
+  }
+
+  function esc(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
