@@ -131,17 +131,17 @@
       <div class="card-body">
         <div class="upload-grid">
           <div class="upload-zone" id="resume-zone" onclick="document.getElementById('resume-input').click()">
-            <input type="file" id="resume-input" accept=".pdf,.docx,.doc" onchange="handleFile(this,'resume')">
+            <input type="file" id="resume-input" accept=".pdf" onchange="handleFile(this,'resume')">
             <div class="upload-icon">📄</div>
             <div class="upload-label">Resume</div>
-            <div class="upload-hint">PDF or Word (.docx)</div>
+            <div class="upload-hint">PDF only</div>
             <div class="upload-filename" id="resume-name"></div>
           </div>
           <div class="upload-zone" id="jd-zone" onclick="document.getElementById('jd-input').click()">
-            <input type="file" id="jd-input" accept=".pdf,.docx,.doc" onchange="handleFile(this,'jd')">
+            <input type="file" id="jd-input" accept=".pdf" onchange="handleFile(this,'jd')">
             <div class="upload-icon">📋</div>
             <div class="upload-label">Job Description</div>
-            <div class="upload-hint">PDF or Word (.docx)</div>
+            <div class="upload-hint">PDF only(.docx)</div>
             <div class="upload-filename" id="jd-name"></div>
           </div>
         </div>
