@@ -11,7 +11,14 @@ const {
 const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB per file
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() === '.pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error(`"${file.originalname}" is not a PDF. Please convert to PDF and try again.`));
+    }
+  }
 });
 
 app.use(express.json());
@@ -45,9 +52,9 @@ app.post('/api/evaluate', upload.fields([
 
     // Determine media types
     const getMediaType = (file) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      if (ext === '.pdf') return 'application/pdf';
-      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.pdf') return 'application/pdf';
+    throw new Error(`"${file.originalname}" is not a PDF. Please convert your file to PDF and upload again.`);
     };
 
     const resumeB64 = resumeFile.buffer.toString('base64');
