@@ -13,7 +13,7 @@ const app = express();
 // Accept PDF, .doc, and .docx uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (['.pdf', '.doc', '.docx'].includes(ext)) {
@@ -31,28 +31,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // ── FILE PREPARATION ──────────────────────────────────────
-// Returns { data: base64string, mediaType: string }
-// PDFs go straight through. Word files are extracted to plain text
-// and sent as plain-text documents (which the API accepts fine).
+// PDFs are sent as base64 documents (natively supported by the API).
+// Word files are extracted to plain text and injected inline in the prompt.
 async function prepareFile(file) {
   const ext = path.extname(file.originalname).toLowerCase();
 
   if (ext === '.pdf') {
     return {
-      data: file.buffer.toString('base64'),
-      mediaType: 'application/pdf'
+      type: 'pdf',
+      data: file.buffer.toString('base64')
     };
   }
 
-  // .doc or .docx — extract text with mammoth, send as plain text
+  // .doc or .docx — extract raw text with mammoth
   const result = await mammoth.extractRawText({ buffer: file.buffer });
   const text = result.value.trim();
   if (!text) {
     throw new Error(`Could not extract text from "${file.originalname}". The file may be empty or corrupted.`);
   }
   return {
-    data: Buffer.from(text, 'utf-8').toString('base64'),
-    mediaType: 'text/plain'
+    type: 'text',
+    text
   };
 }
 
@@ -79,7 +78,7 @@ app.post('/api/evaluate', upload.fields([
     const name = (candidateName || 'Candidate').trim();
     const role = (positionTitle || 'this position').trim();
 
-    // Convert files if needed
+    // Prepare both files
     const [resume, jd] = await Promise.all([
       prepareFile(resumeFile),
       prepareFile(jdFile)
@@ -94,7 +93,7 @@ Tone and style rules — follow strictly:
 - Keep writing concise — avoid unnecessary detail
 - Write in third person`;
 
-    const prompt = `Using the attached resume and job description, produce a structured candidate evaluation for ${name} applying for ${role}.
+    const prompt = `Using the resume and job description provided, produce a structured candidate evaluation for ${name} applying for ${role}.
 
 Output exactly three sections separated by the marker ==SECTION_BREAK== on its own line. Within each section, separate paragraphs with a blank line. Output only the paragraphs and section break markers — no section titles, no labels, no numbering, no other text.
 
@@ -131,20 +130,40 @@ Paragraph 1 — Qualifications Summary: Concise closing paragraph summarizing ho
 Paragraph 2 — Logistics: Rewrite the following recruiter note into a neutral, objective, third-person narrative paragraph covering salary expectations, onsite availability, and sponsorship. Preserve all factual substance.
 Recruiter note: "${(qLogistics || 'The interviewer did not provide logistics information.').trim()}"`;
 
+    // Build the content array for the API call.
+    // PDFs are sent as native base64 documents.
+    // Word files (already extracted to text) are injected inline.
+    const content = [];
+
+    if (resume.type === 'pdf') {
+      content.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: resume.data },
+        title: 'Resume'
+      });
+    } else {
+      content.push({ type: 'text', text: `RESUME:\n${resume.text}` });
+    }
+
+    if (jd.type === 'pdf') {
+      content.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: jd.data },
+        title: 'Job Description'
+      });
+    } else {
+      content.push({ type: 'text', text: `JOB DESCRIPTION:\n${jd.text}` });
+    }
+
+    content.push({ type: 'text', text: prompt });
+
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-sonnet-4-6',
         max_tokens: 1600,
         system: SYSTEM,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'document', source: { type: 'base64', media_type: resume.mediaType, data: resume.data }, title: 'Resume' },
-            { type: 'document', source: { type: 'base64', media_type: jd.mediaType, data: jd.data }, title: 'Job Description' },
-            { type: 'text', text: prompt }
-          ]
-        }]
+        messages: [{ role: 'user', content }]
       },
       {
         headers: {
@@ -184,20 +203,26 @@ app.post('/api/generate-docx', async (req, res) => {
     const sectionTitles = ['Section 1', 'Section 2', 'Section 3'];
     const children = [];
 
+    // Candidate name header
     children.push(new Paragraph({
       children: [new TextRun({ text: name, bold: true, size: 36, font: 'Arial' })],
       spacing: { after: 80 }
     }));
+
+    // Role title
     children.push(new Paragraph({
       children: [new TextRun({ text: role, size: 24, color: '4A4A6A', font: 'Arial' })],
       spacing: { after: 80 }
     }));
+
+    // Date
     children.push(new Paragraph({
       children: [new TextRun({ text: dateStr, size: 20, color: '888888', font: 'Arial' })],
       spacing: { after: 320 },
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '1A1A2E', space: 8 } }
     }));
 
+    // Sections
     sections.forEach((paras, sIdx) => {
       children.push(new Paragraph({
         children: [new TextRun({
